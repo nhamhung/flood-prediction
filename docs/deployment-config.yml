@@ -2,7 +2,7 @@ repository_owner: nhamhhung
 repository_name: flood-prediction
 default_branch: main
 pages_url: https://nhamhhung.github.io/flood-prediction/
-streamlit_url: https://flood-prediction.streamlit.app
+streamlit_url: https://flood-prediction-4jmtseye8jj6sppf8uqzwu.streamlit.app/
 streamlit_entrypoint: app/streamlit_app.py
 streamlit_secrets:
   - KAGGLE_API_TOKEN

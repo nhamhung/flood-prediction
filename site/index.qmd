@@ -11,7 +11,7 @@ This GitHub Pages site contains static documentation. The interactive Python app
 ## Use the project
 
 - [Source repository](https://github.com/nhamhhung/flood-prediction)
-- [Interactive Streamlit app](https://flood-prediction.streamlit.app)
+- [Interactive Streamlit app](https://flood-prediction-4jmtseye8jj6sppf8uqzwu.streamlit.app/)
 - [Clone, fork, and deployment guide](https://github.com/nhamhhung/flood-prediction/blob/main/docs/SETUP_AND_DEPLOYMENT.md)
 
 ## Reproduce it

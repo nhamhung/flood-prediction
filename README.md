@@ -212,5 +212,5 @@ The Streamlit app starts immediately from a bundled 5,000-row random sample sour
 
 - Repository: <https://github.com/nhamhhung/flood-prediction>
 - Report: <https://nhamhung.github.io/flood-prediction/>
-- Streamlit: <https://flood-prediction.streamlit.app>
+- Streamlit: <https://flood-prediction-4jmtseye8jj6sppf8uqzwu.streamlit.app/>
 - Fork setup: [docs/SETUP_AND_DEPLOYMENT.md](docs/SETUP_AND_DEPLOYMENT.md)

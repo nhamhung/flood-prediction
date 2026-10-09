@@ -34,7 +34,7 @@ jupyter: flood-prediction
 
 ::: {.callout-tip}
 ## Interactive application
-[Open the Streamlit app](https://flood-prediction.streamlit.app){target="_blank"}
+[Open the Streamlit app](https://flood-prediction-4jmtseye8jj6sppf8uqzwu.streamlit.app/){target="_blank"}
 :::
 
 ```{python}
