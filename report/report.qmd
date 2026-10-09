@@ -32,6 +32,11 @@ execute:
 jupyter: flood-prediction
 ---
 
+::: {.callout-tip}
+## Interactive application
+[Open the Streamlit app](https://flood-prediction.streamlit.app){target="_blank"}
+:::
+
 ```{python}
 #| echo: false
 #| output: false
