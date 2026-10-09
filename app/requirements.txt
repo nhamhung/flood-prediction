@@ -1,0 +1,13 @@
+# Streamlit Community Cloud reads this file because it is next to the app
+# entrypoint. It intentionally excludes optional training-only model libraries.
+pandas>=2.0
+numpy>=1.24
+scipy>=1.11
+scikit-learn==1.9.1
+joblib>=1.3
+streamlit>=1.35
+matplotlib>=3.8
+seaborn>=0.13
+lightgbm>=4.0
+shap>=0.45
+kaggle>=1.6,<2.0

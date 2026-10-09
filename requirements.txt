@@ -1,0 +1,22 @@
+pandas>=2.0
+numpy>=1.24
+scipy>=1.11
+scikit-learn>=1.4
+joblib>=1.3
+streamlit>=1.35
+matplotlib>=3.8
+seaborn>=0.13
+jupyter>=1.0
+pytest>=8.0
+
+# Models
+xgboost>=2.0
+lightgbm>=4.0
+catboost>=1.2
+
+# Model interpretability (SHAP)
+shap>=0.45
+
+# Automatic dataset download on deployments without a pre-baked Docker image,
+# plus scripts/fetch_leaderboard.py and scripts/would_rank.py
+kaggle>=1.6

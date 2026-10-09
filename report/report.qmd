@@ -1,0 +1,306 @@
+---
+title: "Predicting Flood Probability"
+subtitle: "Recovering a hidden sum from noisy risk factors — a worked case study on Kaggle's Playground Series S4E5"
+author: "Your Name"
+date: today
+format:
+  html:
+    theme:
+      light: flatly
+      dark: darkly
+    css: styles.css
+    toc: true
+    toc-location: left
+    toc-depth: 3
+    number-sections: true
+    code-fold: true
+    code-tools: true
+    code-copy: true
+    title-block-banner: true
+    fig-width: 7.5
+    fig-height: 4.5
+    embed-resources: true
+    smooth-scroll: true
+  pdf:
+    toc: true
+    number-sections: true
+    echo: false
+execute:
+  echo: true
+  warning: false
+  message: false
+jupyter: flood-prediction
+---
+
+```{python}
+#| echo: false
+#| output: false
+import sys
+sys.path.insert(0, "../src")
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from IPython.display import Markdown
+from sklearn.metrics import r2_score
+
+from flood_prediction import config, data, interpretability, leaderboard, model
+
+PALETTE = ["#2c5cc5", "#5b8def", "#8fb4f2", "#e07a5f", "#81b29a"]
+sns.set_theme(style="whitegrid", font="sans-serif")
+plt.rcParams.update({
+    "figure.dpi": 130,
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+    "axes.titleweight": "600",
+    "axes.titlesize": 13,
+    "axes.labelsize": 11,
+})
+
+train_df = data.load_full_train()
+original = pd.read_csv(config.ORIGINAL_CSV)
+private_scores = leaderboard.load_scores(leaderboard.PRIVATE_LEADERBOARD_CSV)
+history = pd.DataFrame(leaderboard.SUBMISSION_HISTORY)
+best = history.loc[history["private"].idxmax()]
+best_place = leaderboard.would_rank(best["private"], best["public"])[0]
+```
+
+## Introduction
+
+Floods are the costliest recurring natural hazard in Vietnam — Typhoon Yagi alone (September 2024)
+flooded much of the north. Real flood forecasting needs rainfall, river gauges, and terrain data;
+this project tackles a much more modest, well-posed version of the question: given an area's scores
+on 20 flood-risk factors, how likely is it to flood?
+
+The data comes from Kaggle's
+[Playground Series S4E5](https://www.kaggle.com/competitions/playground-series-s4e5): 1.1 million
+synthetic training rows, scored by R². It is a good portfolio problem for a reason that isn't
+obvious at first: the target turns out to be a simple function hidden under noise, and the whole
+project is about *finding that function* and then squeezing the last fraction of a percent out of
+the noise — on a leaderboard where 2,794 teams were separated by thousandths of a point.
+
+The competition closed in May 2024, so every submission here is a late one: Kaggle scores it, but
+doesn't rank it. Scores are placed against the frozen final leaderboard instead (@sec-ranking).
+
+## Data
+
+```{python}
+#| echo: false
+X, y = data.split_features_target(train_df)
+Markdown(
+    f"The training set has **{len(train_df):,} rows** and **{len(config.FEATURE_COLS)} integer "
+    f"features**, each a 0–10-ish risk score where higher always means more risk (e.g. a high "
+    f"`DrainageSystems` score means *worse* drainage). There are no missing values. The target, "
+    f"`FloodProbability`, takes only **{y.nunique()} distinct values**, all multiples of 0.005 — a "
+    f"strong hint that it was computed rather than measured."
+)
+```
+
+## The key discovery: the target is (originally) a sum {#sec-discovery}
+
+Playground datasets are generated synthetically from a small "original" dataset. This one's
+original — 50,000 rows, mirrored as `flood.csv` in
+[naiyakhalid/flood-prediction-dataset](https://www.kaggle.com/datasets/naiyakhalid/flood-prediction-dataset) —
+gives the game away:
+
+```{python}
+original_sum = original[config.FEATURE_COLS].sum(axis=1)
+max_error = (original[config.TARGET_COL] - config.ORIGINAL_TARGET_PER_POINT * original_sum).abs().max()
+print(f"max |FloodProbability - 0.005 x sum| over all {len(original):,} original rows: {max_error:.1e}")
+```
+
+**In the original data, `FloodProbability = 0.005 × (sum of the 20 factors)`, exactly.** The
+synthetic generator then perturbed the factor values, which buries the same line in noise
+(@fig-sum).
+
+```{python}
+#| label: fig-sum
+#| fig-cap: "Target against the row sum. Left: the original data is a perfect line. Right: the competition's synthetic data (50,000-row sample) is the same relationship, blurred."
+sample = train_df.sample(50_000, random_state=config.RANDOM_SEED)
+fig, axes = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
+axes[0].scatter(original_sum, original[config.TARGET_COL], s=3, alpha=0.3, color=PALETTE[4])
+axes[0].set_title("Original")
+axes[1].scatter(sample[config.FEATURE_COLS].sum(axis=1), sample[config.TARGET_COL], s=2, alpha=0.08, color=PALETTE[0])
+axes[1].set_title("Competition (synthetic)")
+for ax in axes:
+    ax.set_xlabel("sum of the 20 factors")
+axes[0].set_ylabel("FloodProbability")
+plt.tight_layout()
+plt.show()
+```
+
+That reframes the competition: **given noisy factor values, recover the original row sum.** It also
+explains everything the data does next — why every factor correlates about equally and weakly with
+the target, why their sum correlates strongly, and why plain linear regression is an unusually
+strong baseline here (R² of about 0.845).
+
+## Feature engineering
+
+If the target is a property of the whole row, the features should describe the whole row.
+`RowStatsFeatures` (in `src/flood_prediction/features.py`) keeps the 20 raw factors and adds:
+
+- **11 row statistics:** sum, standard deviation, min, max, median, range, skewness, kurtosis,
+  number of distinct values, and the 25th/75th percentiles.
+- **The row's 20 values, sorted** (`sorted_00` = smallest … `sorted_19` = largest).
+
+Everything added is invariant to *which* factor holds which value — exactly like the sum. The
+intuition: a row whose values are unusually spread out, or skewed, was probably perturbed more,
+so its observed sum is a less reliable estimate of the original one. The sorted values let a tree
+model learn those corrections directly.
+
+## Methodology
+
+- **Validation.** Development decisions used a fixed 20% holdout (seed 42); every number that was
+  submitted used K-fold out-of-fold (OOF) predictions on all 1.1M rows, where each row is predicted
+  by the fold model that never saw it.
+- **Models.** LightGBM, XGBoost, and CatBoost inside one scikit-learn pipeline with the feature
+  step, so training and inference can't drift apart. Linear regression is the baseline.
+- **Blending.** Non-negative least squares on the members' OOF predictions, normalised to sum to 1 —
+  members can be dropped, never subtracted.
+- **Two models, two jobs.** The app uses a single LightGBM (fast, explainable with SHAP); the
+  leaderboard uses the blend.
+
+## Results
+
+### Feature sets and hyperparameters
+
+These comparisons were run during development on the 20% holdout and recorded here (re-running
+them takes ~15 minutes, for no new information on every render):
+
+```{python}
+#| echo: false
+dev_results = pd.DataFrame([
+    {"experiment": "LightGBM, raw 20 factors only", "holdout R²": 0.84206},
+    {"experiment": "LightGBM, + row statistics", "holdout R²": 0.86839},
+    {"experiment": "LightGBM, + row statistics + sorted values", "holdout R²": 0.86860},
+    {"experiment": "  ... with colsample_bytree 0.5 (first guess)", "holdout R²": 0.86872},
+    {"experiment": "  ... with colsample_bytree 1.0, depth 10 (tuned)", "holdout R²": 0.86920},
+    {"experiment": "XGBoost, tuned (colsample 1.0, depth 10)", "holdout R²": 0.86918},
+    {"experiment": "CatBoost (depth 8)", "holdout R²": 0.86891},
+    {"experiment": "Blend of the three tuned models", "holdout R²": 0.86926},
+])
+dev_results.style.format({"holdout R²": "{:.5f}"}).hide(axis="index")
+```
+
+Two lessons stand out:
+
+1. **Row statistics are worth +0.026 R²** — by far the largest gain in the project, and a direct
+   consequence of @sec-discovery.
+2. **Column sampling was the most important hyperparameter.** A common Kaggle default samples half
+   the columns per tree; here that means half the trees can't see `row_sum`. Letting every tree see
+   every column was worth +0.0005 — which, at this leaderboard's density, is the difference between
+   rank ~500 and rank ~200.
+
+### What didn't help
+
+Reported because a negative result is still a result:
+
+- **Adding the 50,000 original rows to training** *hurt* (CatBoost holdout 0.86891 → 0.86838). They
+  come from a different distribution — noise-free — so they teach the model the wrong noise level.
+- **A neural network** (4-layer MLP on the same features, trained on the GPU) plateaued at R² 0.864
+  and received zero blend weight: its errors were 98% correlated with the trees' and simply larger.
+- **Extra row features** (value counts, higher moments, mode) moved holdout R² by less than
+  0.0001 — within noise.
+- **Deeper CatBoost, slower learning rates**: within ±0.00003.
+
+### The leaderboard climb {#sec-ranking}
+
+```{python}
+#| echo: false
+rows = []
+for entry in leaderboard.SUBMISSION_HISTORY:
+    private, public = leaderboard.would_rank(entry["private"], entry["public"])
+    span = f"#{private.rank_best}" if private.rank_best == private.rank_worst else f"#{private.rank_best}–{private.rank_worst}"
+    rows.append({"submission": entry["step"].split(":")[0], "OOF R²": entry["oof_r2"], "public R²": entry["public"],
+                 "private R²": entry["private"], "would rank (private)": span,
+                 "top %": f"{private.percentile:.1f}%"})
+pd.DataFrame(rows).style.format({"OOF R²": "{:.5f}", "public R²": "{:.5f}", "private R²": "{:.5f}"}).hide(axis="index")
+```
+
+```{python}
+#| echo: false
+Markdown(
+    f"The best submission scored **private R² {best['private']:.5f}**, which would have ranked "
+    f"**#{best_place.rank_best} of {best_place.n_teams:,} teams (top {best_place.percentile:.1f}%)**. "
+    f"For scale: rank 1 scored {private_scores.iloc[0]:.5f}, rank 50 scored "
+    f"{private_scores.iloc[49]:.5f}, and rank 500 scored {private_scores.iloc[499]:.5f}."
+)
+```
+
+```{python}
+#| label: fig-leaderboard
+#| fig-cap: "The top 600 of the final (private) leaderboard. Orange dots: this project's late submissions."
+top = private_scores.head(600)
+fig, ax = plt.subplots(figsize=(8, 3.8))
+ax.plot(range(1, len(top) + 1), top.values, color=PALETTE[0], linewidth=1.5)
+for entry in leaderboard.SUBMISSION_HISTORY:
+    rank = leaderboard.place(entry["private"], private_scores, "private").rank_best
+    ax.scatter([rank], [round(entry["private"], 5)], color=PALETTE[3], zorder=3, s=30)
+ax.axvline(50, color="#888", linestyle="--", linewidth=0.8)
+ax.set_xlabel("Final (private) rank")
+ax.set_ylabel("Private R²")
+plt.show()
+```
+
+The board is extraordinarily dense: the entire top 500 fits inside a 0.0004-wide band of R². Joining
+the public and private boards by team shows what top-50 actually required — every one of the 56
+teams that scored a private R² of 0.86899 or better had a public score of at least 0.86939. Most of those teams
+submitted the same widely shared public notebook, which averaged *other people's submission files*
+(including two AutoGluon runs). That approach was deliberately not used here: everything in this
+project is trained from scratch, so the score reflects what the method in this repo actually does.
+
+A consistent pattern worth knowing for anyone repeating this: this project's OOF R² overestimated
+the private score by a steady 0.00046–0.00050 on every submission — the private split is simply harder —
+so OOF was reliable for *ranking* changes even though it isn't on the same scale.
+
+### What the model learned (SHAP)
+
+```{python}
+#| label: fig-shap
+#| fig-cap: "Top features of the app model (LightGBM) by mean |SHAP value| (log scale). Orange: engineered row statistics."
+from flood_prediction.features import ENGINEERED_COLS
+
+pipeline = model.load_pipeline()
+explanation, _ = interpretability.compute_shap_values(pipeline, X, max_samples=2_000)
+top_features = interpretability.top_shap_features(explanation, top_n=12).sort_values("mean_abs_shap")
+fig, ax = plt.subplots(figsize=(7, 4.8))
+colors = [PALETTE[3] if f in ENGINEERED_COLS else PALETTE[0] for f in top_features["feature"]]
+ax.barh(top_features["feature"], top_features["mean_abs_shap"] * 100, color=colors)
+ax.set_xscale("log")
+ax.set_xlabel("Mean |SHAP value| (percentage points, log scale)")
+plt.show()
+all_features = interpretability.top_shap_features(explanation, top_n=len(explanation.feature_names))
+row_sum_share = all_features.set_index("feature").loc["row_sum", "mean_abs_shap"] / all_features["mean_abs_shap"].sum()
+```
+
+```{python}
+#| echo: false
+Markdown(
+    f"`row_sum` alone carries **{row_sum_share:.0%} of all the attribution** (note the log scale); "
+    "what remains goes mostly to the spread statistics (max, std, skew) and the top sorted values, "
+    "which correct the sum for how much a row was perturbed. The named factors barely register on "
+    "their own. That is the correct answer for this data, not a flaw: in a pure sum, every factor "
+    "matters equally, so no single one stands out."
+)
+```
+
+## Limitations
+
+- **Synthetic data.** The "flood probability" is a formula applied to synthetic scores, not observed
+  floods. Nothing here says anything about real flood risk in Vietnam or anywhere else — the
+  calculator in the app is a demonstration of the model, not a risk tool.
+- **Late-submission ranks are hypothetical.** They compare a score against a frozen leaderboard;
+  Kaggle breaks ties by earliest submission, which a late entry would always lose, so ranks are
+  reported as the best position within a tie range.
+- **Prior work was consulted.** After the first submission, the competition's public notebooks were
+  read for hyperparameter ideas (notably the column-sampling setting); features and code here are
+  this project's own.
+
+## Conclusion
+
+The most valuable step in this project wasn't modeling — it was checking the original dataset and
+discovering that the target is a sum. That one fact explained the feature engineering, the
+hyperparameter that mattered, the near-useless individual factors, and the SHAP picture. The rest
+was careful, honest measurement on a leaderboard where the differences that matter live in the
+fourth and fifth decimal place.

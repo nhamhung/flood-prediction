@@ -1,0 +1,31 @@
+# Project data & generated artifacts (regenerable — see README for how to fetch/build)
+data/raw/*
+!data/raw/.gitkeep
+!data/raw/leaderboard/
+data/processed/*
+!data/processed/.gitkeep
+models/*.joblib
+# The small, production-ready default model is required by Streamlit Cloud.
+!models/model.joblib
+submission*.csv
+.env
+.streamlit/secrets.toml
+.venv/
+venv/
+_site/
+catboost_info/
+
+# Quarto render output
+/report/report.html
+!/report/report.html
+/report/report.pdf
+!/report/report.pdf
+/report/report.tex
+/report/.quarto/
+/report/report_files/
+
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+.DS_Store

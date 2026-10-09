@@ -1,0 +1,57 @@
+name: Pages
+
+on:
+  # pages-build is a required branch-protection check, so it must run on
+  # every pull request, including code-only UI fixes.
+  pull_request:
+  push:
+    branches: [main]
+    paths:
+      - "report/**"
+      - "docs/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: pages-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Stage report as the Pages homepage
+        run: mkdir -p _site && cp report/report.html _site/index.html
+      - run: npx --yes http-server _site -p 4173 >/tmp/pages-server.log 2>&1 & npx --yes wait-on http://127.0.0.1:4173
+      - name: Accessibility audit (advisory for the pre-rendered report)
+        continue-on-error: true
+        run: npx --yes pa11y-ci --config .pa11yci.json http://127.0.0.1:4173
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    name: pages-deploy
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

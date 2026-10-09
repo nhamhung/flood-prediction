@@ -1,0 +1,21 @@
+---
+title: "Flood Risk Predictor"
+---
+
+## Project
+
+An end-to-end flood-probability regression project on Kaggle's Playground Series S4E5, including a leaderboard climb from rank #535 to #207 of 2,794.
+
+This GitHub Pages site contains static documentation. The interactive Python application runs separately on Streamlit Community Cloud.
+
+## Use the project
+
+- [Source repository](https://github.com/nhamhhung/flood-prediction)
+- [Interactive Streamlit app](https://flood-prediction.streamlit.app)
+- [Clone, fork, and deployment guide](https://github.com/nhamhhung/flood-prediction/blob/main/docs/SETUP_AND_DEPLOYMENT.md)
+
+## Reproduce it
+
+Clone the repository, create a Python 3.11 or 3.12 environment, install `requirements.txt` and `app/requirements.txt`, run `pytest tests/`, then run `python scripts/smoke_app.py`.
+
+Open Flood Risk Calculator, Dataset Overview, Model Insights, and Leaderboard Climb; load a random real area and read its prediction.
