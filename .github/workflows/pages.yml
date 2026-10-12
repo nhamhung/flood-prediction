@@ -29,7 +29,10 @@ jobs:
         with:
           node-version: "22"
       - name: Stage report as the Pages homepage
-        run: mkdir -p _site && cp report/report.html _site/index.html
+        run: |
+          mkdir -p _site
+          cp report/report.html _site/index.html
+          cp report/theme-base.css report/project-theme.css _site/
       - run: npx --yes http-server _site -p 4173 >/tmp/pages-server.log 2>&1 & npx --yes wait-on http://127.0.0.1:4173
       - name: Accessibility audit (advisory for the pre-rendered report)
         continue-on-error: true

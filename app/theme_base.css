@@ -1,0 +1,99 @@
+/* Shared component system. Project identity is supplied by theme.css. */
+.stApp {
+  background:
+    radial-gradient(circle at 92% 4%, rgba(var(--theme-accent-rgb), .13), transparent 23rem),
+    linear-gradient(180deg, var(--theme-bg) 0%, #ffffff 34rem);
+}
+
+[data-testid="stHeader"] {
+  background: rgba(255, 255, 255, .86);
+  border-bottom: 1px solid rgba(var(--theme-primary-rgb), .12);
+  backdrop-filter: blur(12px);
+}
+
+[data-testid="stHeader"]::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--theme-primary), var(--theme-accent), var(--theme-secondary));
+}
+
+[data-testid="stSidebar"] > div:first-child {
+  background: linear-gradient(180deg, var(--theme-sidebar) 0%, #ffffff 70%);
+  border-right: 1px solid rgba(var(--theme-primary-rgb), .14);
+}
+
+.block-container {
+  max-width: 1280px;
+  padding-top: 2.5rem;
+}
+
+h1, h2, h3 { color: var(--theme-ink); letter-spacing: -.02em; }
+h1 { font-weight: 760; }
+h1::after {
+  content: "";
+  display: block;
+  width: 4.5rem;
+  height: .3rem;
+  margin-top: .65rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--theme-primary), var(--theme-accent));
+}
+h2 { margin-top: 1.4rem; }
+h3 { color: var(--theme-primary); }
+a { color: var(--theme-primary); text-underline-offset: .2em; }
+
+[data-testid="stMetric"] {
+  min-height: 7rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid rgba(var(--theme-primary-rgb), .16);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, .88);
+  box-shadow: 0 10px 30px rgba(var(--theme-primary-rgb), .08);
+}
+[data-testid="stMetricValue"] { color: var(--theme-primary); font-weight: 720; }
+
+.stButton > button, .stDownloadButton > button {
+  border: 1px solid var(--theme-primary);
+  border-radius: .75rem;
+  color: var(--theme-primary);
+  font-weight: 650;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.stButton > button:hover, .stDownloadButton > button:hover {
+  border-color: var(--theme-accent);
+  color: var(--theme-ink);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(var(--theme-primary-rgb), .15);
+}
+
+[data-baseweb="tab-list"] { gap: .4rem; border-bottom: 1px solid rgba(var(--theme-primary-rgb), .15); }
+[data-baseweb="tab"] { border-radius: .65rem .65rem 0 0; font-weight: 620; }
+[aria-selected="true"][data-baseweb="tab"] { background: rgba(var(--theme-accent-rgb), .12); }
+
+[data-testid="stDataFrame"], [data-testid="stTable"], .stPlotlyChart, [data-testid="stPyplotGlobalUse"] {
+  overflow: hidden;
+  border: 1px solid rgba(var(--theme-primary-rgb), .12);
+  border-radius: 1rem;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(var(--theme-primary-rgb), .06);
+}
+
+[data-testid="stAlert"] { border-radius: .85rem; border-left-width: .35rem; }
+div[data-baseweb="select"] > div:focus-within,
+[data-testid="stNumberInput"] input:focus,
+[data-testid="stTextInput"] input:focus {
+  border-color: var(--theme-primary) !important;
+  box-shadow: 0 0 0 2px rgba(var(--theme-primary-rgb), .14) !important;
+}
+
+@media (max-width: 700px) {
+  .block-container { padding: 1.6rem 1rem 3rem; }
+  h1 { font-size: 2rem; }
+  [data-testid="stMetric"] { min-height: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+}
