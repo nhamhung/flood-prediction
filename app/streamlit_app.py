@@ -11,8 +11,10 @@ Or via Docker (from the project root):
 import streamlit as st
 
 from pages_src import leaderboard_climb, model_insights, overview, predict
+from theme import apply_theme
 
 st.set_page_config(page_title="Flood Risk Predictor", page_icon="🌊", layout="wide")
+apply_theme()
 
 pages = [
     # Every page module exports a same-named `render` function, so Streamlit's
